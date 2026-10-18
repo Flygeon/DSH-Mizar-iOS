@@ -347,6 +347,17 @@ package() {
     detail="not signed — install it only after signing it with a certificate and profile that belong to you"
   fi
 
+  # What the phone will read, not what the project file said. Printing it is the
+  # cheap check that the archive really is installable on the oldest supported
+  # iOS: the deployment target has been wrong once, and a build that installs and
+  # then exits is the most expensive way to find that out.
+  local app="$ARCHIVE/Products/Applications/$SCHEME.app"
+  local minimum_os="unknown"
+  if [ -f "$app/Info.plist" ]; then
+    minimum_os="$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$app/Info.plist" 2>/dev/null || echo unknown)"
+  fi
+  echo "ci: MinimumOSVersion $minimum_os"
+
   # A .dSYM is a directory; an artifact is a file.
   local dsyms="$OUT/DSH-Mizar-$version.dSYMs.zip"
   rm -f "$dsyms"
@@ -363,6 +374,7 @@ package() {
     echo "| Build | '$build_number' |"
     echo "| Signing | **$status** |"
     echo "| Export | '$method' |"
+    echo "| Minimum iOS | '$minimum_os' |"
     if [ -n "$ipa" ] && [ -f "$ipa" ]; then
       echo "| Package | '$(basename "$ipa")' ($(du -h "$ipa" | cut -f1)) |"
       echo "| SHA-256 | '$(shasum -a 256 "$ipa" | cut -d' ' -f1)' |"
