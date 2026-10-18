@@ -112,6 +112,11 @@ scripts/release.sh upload     # 直接传到 App Store Connect（TestFlight）
 签名需要一个付费的 Apple 开发者账号（`MIZAR_TEAM_ID` 可覆盖 team id）。
 上传的细节和第一次上传要准备的东西见 `docs/testflight.md`。
 
+**在 GitHub 上出包**（不用自己的 Mac）：推送、打 tag 或手动运行 `iOS` workflow，
+流水线会跑测试、编译，并把 `.ipa` 挂到 Artifacts 里。不配密钥也能出包，但产物是
+未签名的（装不上）；配好六个 secret 就是签名包，还能直接传 TestFlight。
+详见 [docs/ci.md](docs/ci.md)。
+
 ## 目录
 
 | | |

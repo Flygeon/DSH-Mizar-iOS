@@ -1,0 +1,19 @@
+# The CI scripts are bash. A CRLF checkout gives macOS `bad interpreter`,
+# and the workflow would fail before the first line of it ran.
+*.sh            text eol=lf
+*.mjs           text eol=lf
+
+# Xcode project files are rewritten by tools that do not agree about line
+# endings; leaving them alone is what keeps a diff from being the whole file.
+*.pbxproj       -text
+*.xcconfig      -text
+*.xcworkspacedata -text
+*.xcscheme      -text
+*.plist         -text
+*.strings       -text
+*.entitlements  -text
+*.xib           -text
+*.storyboard    -text
+
+# Generated at build time, never worth a diff.
+*.xcuserstate   -text

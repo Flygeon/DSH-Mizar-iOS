@@ -16,3 +16,10 @@ MizarKit/.build/
 
 # --- Node (the mock host needs none, but a stray tree is not source) ---
 node_modules/
+
+# --- CI output (scripts/ci.sh writes here; release/ci is not source) ---
+release/
+
+# --- Local memory database, per checkout, never committed ---
+.dsh-meow/
+

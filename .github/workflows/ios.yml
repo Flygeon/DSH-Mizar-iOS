@@ -1,0 +1,235 @@
+name: iOS
+
+# Build the app on a macOS runner.
+#
+#   push to main / v* tag / manual  ->  signed or unsigned .ipa
+#   pull request                    ->  protocol tests + simulator build
+#   manual, "run the UI tests"      ->  the XCUITest suite against the mock hosts
+#
+# Signing is optional. With no secrets the .ipa is the real Release build but
+# unsigned, so iOS refuses to install it until it is signed with a certificate
+# that belongs to you; with the secrets listed in docs/ci.md the same job
+# produces a signed .ipa and can hand it to TestFlight.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: How the .ipa is signed and exported (ignored without signing secrets)
+        type: choice
+        options:
+          - app-store-connect
+          - release-testing
+          - debugging
+          - ad-hoc
+        default: app-store-connect
+      upload_to_testflight:
+        description: Upload to TestFlight instead of only keeping the .ipa
+        type: boolean
+        default: false
+      run_ui_tests:
+        description: Run the XCUITest suite against the mock hosts (slow, 6+ minutes)
+        type: boolean
+        default: false
+      build_number:
+        description: CFBundleVersion override (default is a UTC timestamp)
+        type: string
+        default: ""
+      xcode_version:
+        description: Xcode to select on the runner, e.g. 26.6 (default is the image's)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  # Localised build errors are useless in a log nobody can grep.
+  LC_ALL: en_US.UTF-8
+  LANG: en_US.UTF-8
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Tests and simulator build
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: ./scripts/ci.sh xcode "${{ inputs.xcode_version }}"
+
+      - name: MizarKit protocol tests
+        run: ./scripts/ci.sh protocol
+
+      - name: Build for the simulator
+        run: ./scripts/ci.sh app
+
+  ui-tests:
+    name: UI tests against the mock hosts
+    # Six minutes on a fast Mac and two fixture hosts. The thing to run when a
+    # change touches the screens, not on every push.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_ui_tests }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: ./scripts/ci.sh xcode "${{ inputs.xcode_version }}"
+
+      - name: Install the fixture host's one dependency
+        # "ws", and only "ws": the app itself has no package dependencies.
+        run: npm install --no-audit --no-fund
+
+      - name: Start the two mock hosts
+        # Two, not one: "scripts/mock-host.mjs 19396" is a *different machine*,
+        # and the tests that switch between computers cannot observe a bug
+        # without it.
+        run: |
+          nohup node scripts/mock-host.mjs 19395 > "$RUNNER_TEMP/mock-19395.log" 2>&1 &
+          nohup node scripts/mock-host.mjs 19396 > "$RUNNER_TEMP/mock-19396.log" 2>&1 &
+          for port in 19395 19396; do
+            up=0
+            for _ in $(seq 1 30); do
+              if curl -fsS "http://127.0.0.1:$port/loads" > /dev/null 2>&1; then up=1; break; fi
+              sleep 1
+            done
+            if [ "$up" != 1 ]; then
+              echo "the mock host on $port never answered:" >&2
+              cat "$RUNNER_TEMP/mock-$port.log" >&2
+              exit 1
+            fi
+          done
+
+      - name: Run AppFlowTests
+        run: |
+          # Pick the newest iOS runtime and its first iPhone by asking simctl,
+          # not by naming a device: the image's device list is not ours to
+          # assume, and "iPhone 18 Pro" on one machine is "no such device" on
+          # another.
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          grid = json.load(sys.stdin)["devices"]
+          def version(name):
+              m = re.search(r"iOS-(\d+)(?:-(\d+))?", name)
+              return (int(m.group(1)), int(m.group(2) or 0)) if m else (0, 0)
+          for runtime in sorted(grid, key=version, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in grid[runtime]:
+                  if device.get("isAvailable", True) and device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      sys.exit(0)
+          sys.exit(1)
+          ')
+          if [ -z "$UDID" ]; then
+            echo "no available iPhone simulator on this runner" >&2
+            xcrun simctl list runtimes >&2
+            exit 1
+          fi
+          xcodebuild test \
+            -project DSH-Mizar.xcodeproj \
+            -scheme DSH-Mizar \
+            -destination "id=$UDID" \
+            -derivedDataPath .devcache/ci/DerivedData \
+            -resultBundlePath "$RUNNER_TEMP/DSH-Mizar-UI.xcresult" \
+            -only-testing:DSH-MizarUITests/AppFlowTests \
+            -maximum-concurrent-test-simulator-destinations 1 \
+            CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES
+
+      - name: Keep the results when the tests fail
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: DSH-Mizar-UI-tests
+          path: |
+            ${{ runner.temp }}/DSH-Mizar-UI.xcresult
+            ${{ runner.temp }}/mock-*.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  ipa:
+    name: IPA
+    needs: test
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      # The six secrets, once, for every step in the job: scripts/ci.sh reads
+      # them itself. SIGNING_READY only decides whether the keychain steps run,
+      # so a run without them still produces an (unsigned) .ipa instead of
+      # failing at the first step that needs an identity.
+      SIGNING_READY: ${{ secrets.APPLE_CERTIFICATE_P12 != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPSTORE_API_KEY_ID != '' && secrets.APPSTORE_API_ISSUER_ID != '' && secrets.APPSTORE_API_PRIVATE_KEY != '' }}
+      APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      # A fork cannot be signed against the bundle id this project names: that
+      # App ID belongs to another team. Set the variable to your own and the
+      # project is rewritten in the checkout, never in the repository.
+      BUNDLE_ID: ${{ vars.BUNDLE_ID }}
+      EXPORT_METHOD: ${{ inputs.export_method || 'app-store-connect' }}
+      UPLOAD: ${{ inputs.upload_to_testflight && '1' || '0' }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: ./scripts/ci.sh xcode "${{ inputs.xcode_version }}"
+
+      - name: Import the signing identity
+        if: env.SIGNING_READY == 'true'
+        env:
+          KEYCHAIN_PATH: ${{ runner.temp }}/app-signing.keychain-db
+        run: ./scripts/ci.sh sign
+
+      - name: Build the .ipa
+        run: ./scripts/ci.sh ipa
+
+      - name: Upload the .ipa and its dSYMs
+        if: env.UPLOAD != '1'
+        uses: actions/upload-artifact@v7
+        with:
+          name: DSH-Mizar-ipa
+          path: |
+            release/ci/*.ipa
+            release/ci/*.dSYMs.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload the dSYMs
+        # An upload destination never produces a local .ipa; the symbols are
+        # still worth keeping for the crash reports it will generate.
+        if: env.UPLOAD == '1'
+        uses: actions/upload-artifact@v7
+        with:
+          name: DSH-Mizar-dSYMs
+          path: release/ci/*.dSYMs.zip
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Write the run summary
+        if: always()
+        run: |
+          if [ -f release/ci/summary.md ]; then
+            cat release/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Forget the signing keychain
+        if: always()
+        run: |
+          if [ "${SIGNING_READY:-false}" = "true" ]; then
+            security delete-keychain "${KEYCHAIN_PATH:-$RUNNER_TEMP/app-signing.keychain-db}" || true
+          fi
