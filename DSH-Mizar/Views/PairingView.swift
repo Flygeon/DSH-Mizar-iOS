@@ -56,7 +56,7 @@ struct PairingView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 6)
                     }
-                    .buttonStyle(.glassProminent)
+                    .mizarGlassButton(prominent: true)
                     .controlSize(.extraLarge)
                     .disabled(!DataScannerViewController.isSupported)
                     .padding(.top, 32)
@@ -150,7 +150,7 @@ struct PairingView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glassProminent)
+            .mizarGlassButton(prominent: true)
             .controlSize(.large)
             .disabled(!canSubmit || pairing)
             .padding(.top, 4)

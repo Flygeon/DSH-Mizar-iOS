@@ -220,7 +220,7 @@ struct UnpairedView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
-                .buttonStyle(.glassProminent)
+                .mizarGlassButton(prominent: true)
                 .controlSize(.extraLarge)
                 .padding(.horizontal, 28)
                 .accessibilityIdentifier("unpaired.scan")

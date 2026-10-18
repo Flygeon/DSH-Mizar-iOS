@@ -172,7 +172,7 @@ struct SessionDetailView: View {
             // Dragging the conversation puts the keyboard away, which is what
             // every messaging app does and what a thumb already expects.
             .scrollDismissesKeyboard(.interactively)
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .mizarScrollEdgeEffect(.bottom)
             .refreshable { await reload() }
             .onScrollGeometryChange(for: Bool.self) { geometry in
                 let distance = geometry.contentSize.height - geometry.visibleRect.maxY

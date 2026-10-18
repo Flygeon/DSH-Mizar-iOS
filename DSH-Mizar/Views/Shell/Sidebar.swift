@@ -63,7 +63,7 @@ struct SidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFooter(actions: actions)
         }
-        .scrollEdgeEffectStyle(.soft, for: .vertical)
+        .mizarScrollEdgeEffect(.vertical)
         .background(Theme.sidebarBackground)
         .onChange(of: model.selectedSessionId, initial: true) { _, selected in
             revealSelection(selected)

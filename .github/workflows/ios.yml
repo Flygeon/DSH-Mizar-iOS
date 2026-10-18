@@ -74,6 +74,24 @@ jobs:
       - name: Build for the simulator
         run: ./scripts/ci.sh app
 
+  oldest-supported:
+    name: Builds against the oldest supported iOS
+    # The app shipped as iOS 26 only, and on iOS 18 it installed and then
+    # exited immediately: a deployment target of 26.0 makes a binary whose
+    # SwiftUI types do not exist on the phone. Compiling against the iOS 18
+    # SDK is not the same check as running there, but it is the one that
+    # catches the whole class of mistake, because a 26-only symbol is a
+    # compile error at 18 and nothing at all at 26.
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: ./scripts/ci.sh xcode "${{ inputs.xcode_version }}"
+
+      - name: Build against iOS 18
+        run: ./scripts/ci.sh app 18.0
   ui-tests:
     name: UI tests against the mock hosts
     # Six minutes on a fast Mac and two fixture hosts. The thing to run when a

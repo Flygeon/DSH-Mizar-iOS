@@ -11,7 +11,10 @@
 
 ## 一、编译运行
 
-需要 Xcode 26 以上（iOS 26 起：界面用的是 Liquid Glass）。
+支持 **iOS 18 及以上**（iPhone 和 iPad）。在 iOS 26 上界面用 Liquid Glass；iOS 18–25
+上自动改用系统的材质面板，功能完全一致。
+
+需要 Xcode 26 以上编译（SDK 要能编 iOS 26 的 API；旧的 Xcode 编不了）。
 
 ```sh
 git clone git@github.com:ShirazuNagisa/DSH-Mizar-iOS.git

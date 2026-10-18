@@ -84,7 +84,7 @@ struct ComposerView: View {
         }
         .contentShape(.rect)
         .onTapGesture { focused = true }
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
+        .liquidSurface(in: RoundedRectangle(cornerRadius: Self.corner, style: .continuous), interactive: true)
         .animation(.mizarSmooth, value: text.isEmpty)
         .padding(.horizontal, 10)
         .padding(.bottom, 6)

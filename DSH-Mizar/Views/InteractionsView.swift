@@ -149,7 +149,7 @@ struct InteractionsDock: View {
                 RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                     .fill(.clear)
                     .frame(height: 40)
-                    .glassEffect(.regular.tint(tint(for: card).opacity(0.25)), in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                    .liquidSurface(in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous), tint: tint(for: card).opacity(0.25))
                     .scaleEffect(1 - CGFloat(depth + 1) * 0.05, anchor: .top)
                     .offset(y: -CGFloat(depth + 1) * 7)
                     .opacity(1 - Double(depth) * 0.35)
@@ -207,11 +207,11 @@ struct InteractionsDock: View {
             // A card taller than the dock fades out at its lower edge, so
             // "there is more below" is visible rather than a clean cut that
             // reads as the end of the card.
-            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .mizarScrollEdgeEffect(.bottom)
             .scrollIndicators(.visible)
             .frame(height: min(contentHeights[card.id] ?? 180, maxHeight))
         }
-        .glassEffect(.regular.tint(tint(for: card).opacity(0.08)), in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .liquidSurface(in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous), tint: tint(for: card).opacity(0.08))
         .overlay {
             RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                 .strokeBorder(tint(for: card).opacity(0.28), lineWidth: 0.75)
@@ -345,7 +345,7 @@ struct ApprovalCard: View {
                 } label: {
                     buttonLabel("Reject", busy: answering == .rejected)
                 }
-                .buttonStyle(.glass)
+                .mizarGlassButton()
                 .tint(Theme.failed)
                 .accessibilityIdentifier("approval.reject")
 
@@ -354,7 +354,7 @@ struct ApprovalCard: View {
                 } label: {
                     buttonLabel("Allow once", busy: answering == .allowedOnce)
                 }
-                .buttonStyle(.glassProminent)
+                .mizarGlassButton(prominent: true)
                 .accessibilityIdentifier("approval.allowOnce")
             }
             .controlSize(.large)
@@ -417,7 +417,7 @@ struct QuestionCard: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glassProminent)
+            .mizarGlassButton(prominent: true)
             .controlSize(.large)
             .disabled(!isComplete || submitting)
             .animation(.mizarSnappy, value: isComplete)

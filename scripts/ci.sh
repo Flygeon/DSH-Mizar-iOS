@@ -125,12 +125,24 @@ protocol_tests() {
 simulator_build() {
   # Compiling is the check here, not running: the UI suite has its own job, and
   # a Debug build is what would break first if the app stopped compiling.
+  #
+  # The optional first argument is a deployment target, and it is the whole
+  # point of the second use of this function: overriding IPHONEOS_DEPLOYMENT_TARGET
+  # to 18.0 turns every iOS 26-only API into a compile error, which is how the
+  # app stopped being installable on iOS 18 without anybody noticing.
+  local target="${1:-}"
+  local override=()
+  if [ -n "$target" ]; then
+    override=(IPHONEOS_DEPLOYMENT_TARGET="$target")
+  fi
+  echo "ci: building for the simulator${target:+ at iOS $target}"
   xcodebuild build \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
     -configuration Debug \
     -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath "$CACHE/DerivedData" \
+    ${override[@]+"${override[@]}"} \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO
 }
@@ -367,7 +379,7 @@ package() {
 case "${1:-}" in
   xcode)    select_xcode "${2:-}" ;;
   protocol) protocol_tests ;;
-  app)      simulator_build ;;
+  app)      simulator_build "${2:-}" ;;
   sign)     import_identity ;;
   ipa)
     archive_app

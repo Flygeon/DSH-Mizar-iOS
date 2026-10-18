@@ -100,10 +100,19 @@ UI 测试（`AppFlowTests`，约 6 分钟）默认不跑，手动勾 `run_ui_tes
 它要起两个假主机（`node scripts/mock-host.mjs 19395` 和 `19396`），两个端口缺一不可 ——
 少一个，跨电脑切换的那几个用例会去连一个不存在的服务。
 
+## 最低系统版本
+
+App 支持 **iOS 18.0 及以上**；在 iOS 26 上界面用 Liquid Glass，18–25 上自动换成
+系统的材质面板，功能一致。
+
+`oldest-supported` 这个 job 会把 `IPHONEOS_DEPLOYMENT_TARGET` 强行压到 18.0 再编一遍。
+这一遍是**故意的重复**：部署目标写成 26.0 时，代码里任何 iOS 26 专属 API 都不报错，
+而到了 iOS 18 真机上就是启动后立刻退出 —— 编译期在 18 上失败，是唯一能挡住这类问题的检查。
+改这里的版本号之前，先想一遍它为什么存在。
 ## 已知边界
 
-- runner 用 `macos-26`（Apple Silicon）。Xcode 镜像自带 26.x；工程要求 Xcode 26+、
-  `IPHONEOS_DEPLOYMENT_TARGET = 26.0`。要换版本就在 Run workflow 里填 `xcode_version`。
+- runner 用 `macos-26`（Apple Silicon）。Xcode 镜像自带 26.x；编译需要 Xcode 26+（要能编
+  iOS 26 SDK），但产物最低支持 iOS 18.0。要换 Xcode 就在 Run workflow 里填 `xcode_version`。
 - 打包耗时约 10–20 分钟（含排队）；UI 测试另算，单独一个 job。
 - 公开仓库走 GitHub 免费的 Actions 额度，但 macOS 的分钟数按 10 倍折算，
   所以 UI 测试不要挂在每次 push 上。

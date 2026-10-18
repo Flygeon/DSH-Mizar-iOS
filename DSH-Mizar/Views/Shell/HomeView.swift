@@ -112,7 +112,7 @@ struct HomeView: View {
         }
         .contentShape(.rect)
         .onTapGesture { focused = true }
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
+        .liquidSurface(in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous), interactive: true)
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
     }
