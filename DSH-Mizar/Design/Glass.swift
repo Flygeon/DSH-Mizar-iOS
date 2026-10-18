@@ -77,8 +77,10 @@ extension View {
             }
             .clipShape(shape)
             .overlay {
+                // `stroke`, not `strokeBorder`: the latter is only on
+                // `InsettableShape`, and this helper takes any `Shape`.
                 shape
-                    .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.75)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 0.75)
                     .allowsHitTesting(false)
             }
             .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
